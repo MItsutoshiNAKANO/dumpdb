@@ -48,8 +48,6 @@ _END_OF_HELP_
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
 my $VERSION = '0.1.0-SNAPSHOT';
 
-use constant STATIC_QUERIES => qw(table_info column_info);
-
 sub HELP_MESSAGE { print HELP }
 sub VERSION_MESSAGE { say $VERSION }
 
@@ -78,7 +76,7 @@ unless ($sth) {
 my @NAMES = @{$sth->{NAME}};
 
 my $table = $sth->fetchall_arrayref;
-my $json = JSON::PP->new->utf8->pretty;
+my $json = JSON::PP->new->utf8->pretty->allow_nonref;
 say $json->encode([{ header => \@NAMES }, { body => $table }]);
 
 __END__
