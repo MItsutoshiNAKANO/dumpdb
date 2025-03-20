@@ -1,0 +1,9 @@
+{
+    "defaults": {
+        "connect": [
+            "dbi:Pg:dbname=postgres", "postgres", "postgres", {
+                "RaiseError" : 1, "PrintWarn": 1
+            }
+        ]
+    }
+}
