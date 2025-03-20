@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 =head1 COPYRIGHT
 
-Copyright 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+Copyright 2025 Mitsutoshi Nakano <ItSANgo@gmail.com>
 
 =head1 DESCRIPTION
 
@@ -30,17 +30,18 @@ use JSON::PP;
 use DumpDb;
 
 use constant HELP => <<_END_OF_HELP_;
-Usage: $0 [-u user] [-p password] [-a attributes] dsn query [args]
+Usage: $0 [options] query [args]
 Options:
+    -f file         Configuration file (default: ~/.dumpdb.rc.json)
+    -d dsn          Data source
     -u user         User name
     -p password     Password
     -a attributes   Connection attributes
 Arguments:
-    dsn             Data source
     query           select_query|'table_info'|'column_info'
     args            Arguments
 Example:
-    $0 -u 'user' -a 'RaiseError=1,PrintWarn=1' 'dbi:Pg:host=localhost' column_info 'schema=public,table=table_name'
+    $0 -d 'dbi:Pg:dbname=postgres' -u 'user' -a 'RaiseError=1,PrintWarn=1' column_info 'schema=public,table=table_name'
 For more details run:
     perldoc -F $0
 _END_OF_HELP_
@@ -48,16 +49,34 @@ _END_OF_HELP_
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
 my $VERSION = '0.1.0-SNAPSHOT';
 
+my $default_rc = {
+    defaults => {
+        connect => ['dbi:Pg:dbname=postgres', "postgres", "postgres", {
+            RaiseError => 1, PrintError => 1
+        }]
+    }
+};
+
 sub HELP_MESSAGE { print HELP }
 sub VERSION_MESSAGE { say $VERSION }
 
-getopts('u:p:a:', \my %opts) or die HELP;
+getopts('f:d:u:p:a:', \my %opts) or die HELP;
+my $rc_file = $opts{f} // $ENV{HOME} . '/.dumpdb.rc.json';
 
-my $user = $opts{u} // '';
-my $password = $opts{p};
-my $attr = { split(/[ ,=]/, $opts{a} // '') };
+my $json = JSON::PP->new->utf8->pretty->allow_nonref;
+my $rc_string = do { local $/; my $fh; open $fh, '<', $rc_file and <$fh> };
+my $config;
+if ($rc_string) { $config = $json->decode($rc_string) }
+elsif ($opts{f}) { die "failed to read $rc_file: $!" }
+else { $config = $default_rc }
 
-my $dsn = shift @ARGV or die HELP;
+my $dsn = $opts{d} // $config->{defaults}->{connect}->[0];
+my $user = $opts{u} // $config->{defaults}->{connect}->[1];
+my $password = $opts{p} // $config->{defaults}->{connect}->[2];
+my $attr = {
+    split(/[ ,=]/, $opts{a} // '')
+} || $config->{defaults}->{connect}->[3];
+
 my $query = shift @ARGV or die HELP;
 my $args = { split(/[ ,=]/, shift @ARGV // '') };
 
@@ -76,7 +95,6 @@ unless ($sth) {
 my @NAMES = @{$sth->{NAME}};
 
 my $table = $sth->fetchall_arrayref;
-my $json = JSON::PP->new->utf8->pretty->allow_nonref;
 say $json->encode([{ header => \@NAMES }, { body => $table }]);
 
 __END__
